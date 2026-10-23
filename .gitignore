@@ -1,0 +1,27 @@
+# AWS credentials
+.aws/
+credentials
+
+# Private keys
+*.pem
+*.key
+*.ppk
+
+# Environment variables
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
