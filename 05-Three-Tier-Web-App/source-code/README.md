@@ -46,10 +46,10 @@ The backend is packaged as an executable WAR and deployed to Amazon EC2.
 
 ### Backend Repository
 
-Add the GitHub repository link here:
+
 
 ```text
-https://github.com/Rakeshchary-Bangaru/<backend-repository>
+https://github.com/Rakeshchary-Bangaru/Java-Projects/tree/main/ECommerceOrderEngine
 ```
 
 ---
@@ -83,7 +83,7 @@ The production React build is deployed to a private Amazon S3 bucket and served 
 
 ### Frontend Repository
 
-Add the GitHub repository link here:
+
 
 ```text
 https://github.com/Rakeshchary-Bangaru/Web-Development-Projects/tree/main/React/ecommerce-order-engine-ui
