@@ -1,126 +1,75 @@
 # Serverless Lead Capture on AWS
 
-A hands-on AWS serverless project that demonstrates how to deploy a static website securely using Amazon S3 and CloudFront, and progressively add a serverless backend for capturing customer enquiries.
+A hands-on AWS serverless project that hosts a static website securely using Amazon S3 and CloudFront and provides a fully serverless backend for processing contact enquiries.
 
-The application used in this project is **CloudNova**, a fictional cloud and software services website built using HTML, CSS, and JavaScript.
+The application used for this project is **CloudNova**, a fictional cloud and software services website built with HTML, CSS, and JavaScript.
 
----
+## Project Status
 
-## Project Overview
+**Completed core architecture**
 
-CloudNova contains:
+The application currently supports:
 
-- Home section
-- Services section
-- Projects section
-- About section
-- Contact form
+- Static website hosting using Amazon S3
+- HTTPS content delivery through CloudFront
+- Private S3 origin using Origin Access Control
+- Dynamic contact form submission
+- HTTP API using Amazon API Gateway
+- Serverless backend processing using AWS Lambda
+- Lead persistence in Amazon DynamoDB
+- Owner email notifications through Amazon SES
+- Lambda monitoring and logs through Amazon CloudWatch
+- Least-privilege IAM permissions
 
-The frontend is hosted using AWS services, while the Contact Us form will be connected to a completely serverless backend.
-
-The goal of this project is not only to deploy an application, but also to understand:
-
-- Why each AWS service is used
-- Serverless architecture
-- Event-driven architecture
-- Static vs dynamic applications
-- Secure cloud storage
-- Content delivery
-- API communication
-- NoSQL data storage
-- Email notifications
-- IAM permissions
-- Monitoring and logging
+Customer acknowledgement emails are planned after Amazon SES production access is enabled.
 
 ---
 
-## Frontend Technologies
+## Architecture
 
-The CloudNova frontend is developed using:
+```mermaid
+flowchart TD
+    User[User Browser]
 
-- HTML
-- CSS
-- JavaScript
+    CF[Amazon CloudFront]
+    S3[Private Amazon S3 Bucket]
 
-The original frontend source code is maintained separately in the `Web-Development-Projects` repository.
+    Form[CloudNova Contact Form]
+    API[Amazon API Gateway\nPOST /contact]
+    Lambda[AWS Lambda\nCloudNovaContactHandler]
 
-This AWS repository contains the cloud architecture, backend implementation, deployment documentation, screenshots, and AWS-specific configuration.
+    DDB[(Amazon DynamoDB\nContactMessages)]
+    SES[Amazon SES]
+    Owner[Site Owner Email]
 
----
+    CW[Amazon CloudWatch]
 
-# AWS Architecture
+    User -->|HTTPS| CF
+    CF -->|Origin Access Control| S3
 
-## Current Architecture - Phase 1
+    S3 --> Form
+    Form -->|HTTPS POST| API
+    API --> Lambda
 
-```text
-                 User Browser
-                      |
-                      | HTTPS
-                      v
-              Amazon CloudFront
-                      |
-                      | Origin Access Control
-                      v
-               Private S3 Bucket
-                      |
-          -------------------------
-          |           |           |
-      index.html  style.css   contact.js
-```
+    Lambda -->|PutItem| DDB
+    Lambda -->|SendEmail| SES
+    SES --> Owner
 
-The CloudNova frontend is currently deployed successfully through Amazon CloudFront.
-
-The S3 bucket remains private and cannot be accessed directly from the public internet.
-
-CloudFront is the public entry point to the website.
-
----
-
-# Final Planned Architecture
-
-```text
-                         User
-                          |
-                          | HTTPS
-                          v
-                   Amazon CloudFront
-                          |
-                          v
-                    Amazon S3
-                Static Frontend
-                          |
-                          |
-                  Contact Form
-                          |
-                          | HTTPS POST
-                          v
-                    API Gateway
-                          |
-                          v
-                     AWS Lambda
-                    /          \
-                   /            \
-                  v              v
-           Amazon DynamoDB    Amazon SES
-             Store Lead       Send Emails
-                  |
-                  v
-            Amazon CloudWatch
-             Logs / Metrics
+    Lambda -->|Logs & Metrics| CW
 ```
 
 ---
 
-# AWS Region
+## AWS Region
 
-Regional AWS resources are deployed in:
+Regional resources are deployed in:
 
 ```text
 Asia Pacific (Sydney)
 ap-southeast-2
 ```
 
-Services planned in Sydney:
+Regional services:
 
 - Amazon S3
 - AWS Lambda
@@ -131,23 +80,180 @@ Services planned in Sydney:
 
 Amazon CloudFront is a global AWS service.
 
-This project does not currently use Route 53 because no custom domain is required.
-
-The website uses the default CloudFront HTTPS domain.
+Route 53 and a custom domain are not currently used. The project uses the default CloudFront HTTPS domain.
 
 ---
 
-# Phase 1 - Static Website Deployment
+# Application Flow
 
-## Amazon S3
-
-Amazon S3 is used to store the CloudNova static frontend files.
-
-Current deployment structure:
+When a visitor submits the CloudNova contact form:
 
 ```text
-S3 Bucket
-|
+Visitor
+   |
+   v
+CloudFront
+   |
+   v
+Private S3
+   |
+   v
+JavaScript Contact Form
+   |
+   | POST /contact
+   v
+API Gateway
+   |
+   v
+Lambda
+   |
+   +-----------------------+
+   |                       |
+   v                       v
+DynamoDB                  SES
+Store enquiry       Send owner email
+   |
+   v
+CloudWatch
+Logs / Metrics
+```
+
+Lambda:
+
+1. Receives the request
+2. Parses the submitted JSON
+3. Validates required fields
+4. Generates a UUID
+5. Adds a timestamp
+6. Saves the enquiry in DynamoDB
+7. Sends an email notification to the site owner
+8. Returns a success response containing the enquiry ID
+
+The frontend then displays the generated reference ID to the visitor.
+
+---
+
+# AWS Services Used
+
+| AWS Service | Purpose |
+|---|---|
+| Amazon S3 | Stores HTML, CSS and JavaScript |
+| Amazon CloudFront | CDN, HTTPS and secure frontend delivery |
+| Origin Access Control | Allows CloudFront to securely access private S3 |
+| API Gateway | Provides the public HTTP API |
+| AWS Lambda | Executes serverless backend logic |
+| Amazon DynamoDB | Stores contact enquiries |
+| Amazon SES | Sends owner email notifications |
+| AWS IAM | Controls service permissions |
+| Amazon CloudWatch | Logs and monitors Lambda executions |
+
+---
+
+# Why Serverless?
+
+A contact form is an event-driven workload.
+
+The backend does not need to run continuously.
+
+Example:
+
+```text
+No form submission
+        |
+        v
+No Lambda execution
+
+
+Form submitted
+        |
+        v
+Lambda executes
+        |
+        v
+Processing completes
+        |
+        v
+Execution ends
+```
+
+A continuously running EC2 server would require maintaining compute resources even when no visitors are submitting forms.
+
+With Lambda, backend code runs only when required.
+
+## Server-Based Approach
+
+```text
+EC2
+ |
+Operating System
+ |
+Web/Application Server
+ |
+Backend Runtime
+ |
+Application
+```
+
+The developer may need to manage:
+
+- Operating system updates
+- Security patches
+- Web server configuration
+- Runtime configuration
+- Capacity
+- Scaling
+- Availability
+
+## Serverless Approach
+
+```text
+API Gateway
+     |
+     v
+Lambda
+```
+
+AWS manages most of the underlying compute infrastructure.
+
+The developer mainly manages:
+
+- Application code
+- Configuration
+- IAM permissions
+- Business logic
+
+---
+
+# Event-Driven Architecture
+
+The project is event-driven because processing begins when an event occurs.
+
+For CloudNova:
+
+```text
+Contact form submitted
+        |
+        v
+API Gateway receives request
+        |
+        v
+Lambda is triggered
+        |
+        +---- Save enquiry
+        |
+        +---- Send email
+```
+
+The form submission is the event.
+
+---
+
+# Amazon S3
+
+S3 stores the static deployment files:
+
+```text
+cloudnova-deploy/
 ├── index.html
 ├── css/
 │   └── style.css
@@ -155,118 +261,37 @@ S3 Bucket
     └── contact.js
 ```
 
-### Why S3?
+The bucket is private.
 
-CloudNova currently consists of static files:
+## Why S3 Instead of EC2?
+
+CloudNova's frontend consists only of:
 
 - HTML
 - CSS
 - JavaScript
 
-A continuously running server is not required just to serve these files.
-
-S3 provides a simple and scalable storage solution for static web assets.
+It does not require a continuously running application server.
 
 ### Advantages
 
 - No server management
 - Highly scalable
-- Durable storage
-- Simple deployment
-- Integrates with CloudFront
-- Suitable for static assets
+- Durable object storage
+- Simple static asset deployment
+- Integrates directly with CloudFront
 
 ### Disadvantages
 
-- Cannot directly execute backend application code
-- Not a traditional application server
-- Dynamic functionality requires other AWS services
-
-### Why not EC2?
-
-The frontend does not require:
-
-- Java
-- Node.js
-- Spring Boot
-- PHP
-- A continuously running process
-
-Using EC2 only to serve static HTML, CSS, and JavaScript would introduce unnecessary server management.
-
-With EC2, we would need to manage:
-
-```text
-Virtual Machine
-      |
-Operating System
-      |
-Web Server
-      |
-Security Updates
-      |
-Patching
-      |
-Scaling
-```
-
-For a static frontend, S3 is simpler.
+- Cannot execute backend application code
+- Dynamic operations require additional services
+- Not a traditional filesystem/application server
 
 ---
 
 # Amazon CloudFront
 
-Amazon CloudFront is used as the public delivery layer for CloudNova.
-
-Current request flow:
-
-```text
-User
- |
- v
-CloudFront
- |
- v
-Private S3 Bucket
-```
-
-CloudFront communicates with the S3 bucket using **Origin Access Control (OAC)**.
-
-The S3 bucket remains private.
-
-### Why CloudFront?
-
-CloudFront provides:
-
-- HTTPS
-- Global content delivery
-- Edge caching
-- Secure access to private S3 content
-- Improved website delivery
-- Reduced direct access to the S3 origin
-
-### Advantages
-
-- Global CDN
-- HTTPS support
-- Caching
-- Low-latency delivery
-- Integration with S3
-- Supports private origins
-
-### Disadvantages
-
-- Additional configuration
-- Cached files may need invalidation after updates
-- Adds another AWS service to manage
-
----
-
-# Origin Access Control
-
-CloudFront uses **Origin Access Control (OAC)** to access the private S3 bucket.
-
-Architecture:
+CloudFront is the public entry point for the website.
 
 ```text
 Internet
@@ -274,221 +299,35 @@ Internet
    v
 CloudFront
    |
-   | Authorized request
    v
 Private S3
 ```
 
-Users cannot directly access the S3 bucket.
+CloudFront provides:
 
-This provides a better security model than making the entire bucket publicly readable.
+- HTTPS
+- Content caching
+- Global edge delivery
+- Secure access to S3
+- Reduced direct access to the origin
 
----
+## Origin Access Control
 
-# Static vs Dynamic Content
-
-## Static Content
-
-The following parts of CloudNova are static:
-
-- Home
-- Services
-- Projects
-- About
-- Contact form UI
-
-These files are delivered from S3 through CloudFront.
-
-```text
-Browser
-   |
-CloudFront
-   |
-S3
-```
+Origin Access Control allows CloudFront to access the private S3 bucket without exposing that bucket directly to the public internet.
 
 ---
 
-## Dynamic Content
+# API Gateway
 
-The Contact Us workflow will become the dynamic portion of the application.
+CloudNova uses an HTTP API.
 
-Example:
-
-```text
-User enters:
-
-Name
-Email
-Phone
-Message
-
-        |
-        v
-
-JavaScript
-
-        |
-        v
-
-API Gateway
-
-        |
-        v
-
-Lambda
-
-       / \
-      /   \
-     v     v
-
-DynamoDB  SES
-```
-
-The system will dynamically:
-
-1. Receive the customer enquiry
-2. Validate the submitted data
-3. Generate a unique enquiry ID
-4. Store the enquiry in DynamoDB
-5. Send a confirmation email to the customer
-6. Send a notification email to the administrator
-7. Return a response to the frontend
-8. Record execution logs in CloudWatch
-
----
-
-# Why Serverless?
-
-The CloudNova backend is designed as a serverless application.
-
-A Contact Us form does not need a backend server running continuously.
-
-Traffic may be intermittent:
-
-```text
-10:00 AM  -> 0 requests
-11:00 AM  -> 2 requests
-12:00 PM  -> 0 requests
-3:00 PM   -> 1 request
-```
-
-Running an EC2 instance continuously would mean maintaining compute resources even when there are no requests.
-
-With AWS Lambda:
-
-```text
-No Event
-   |
-No Lambda Execution
-
-
-Contact Form Submitted
-   |
-Lambda Executes
-   |
-Processing Completes
-   |
-Execution Ends
-```
-
----
-
-# What Does Serverless Mean?
-
-Serverless does **not** mean that servers do not exist.
-
-The servers still exist, but AWS manages the underlying infrastructure.
-
-With a traditional server we manage more infrastructure:
-
-```text
-Application
-    |
-Runtime
-    |
-Operating System
-    |
-Virtual Machine
-    |
-Physical Infrastructure
-```
-
-With Lambda we primarily manage:
-
-```text
-Application Code
-      |
-Configuration
-      |
-Permissions
-```
-
-AWS manages most of the underlying compute infrastructure.
-
----
-
-# Event-Driven Architecture
-
-CloudNova uses an event-driven approach.
-
-An event is something that happens in the application and triggers another action.
-
-For this project:
-
-```text
-Contact Form Submitted
-        |
-        | Event
-        v
-API Gateway receives request
-        |
-        v
-Lambda executes
-        |
-        +---- Save enquiry
-        |
-        +---- Send emails
-```
-
-The backend runs because an event occurred.
-
-Other examples of event-driven systems include:
-
-```text
-File uploaded to S3
-        |
-        v
-Trigger Lambda
-
-
-Message added to queue
-        |
-        v
-Process message
-
-
-Database record changes
-        |
-        v
-Trigger another workflow
-```
-
----
-
-# Planned Serverless Backend
-
-## Amazon API Gateway
-
-API Gateway will expose an HTTP endpoint for the CloudNova frontend.
-
-Example:
+Route:
 
 ```text
 POST /contact
 ```
 
-Request flow:
+API Gateway receives requests from the frontend and forwards them to Lambda.
 
 ```text
 contact.js
@@ -500,58 +339,70 @@ API Gateway
 Lambda
 ```
 
-### Why API Gateway?
+## Why API Gateway?
 
-A browser needs an HTTP endpoint to communicate with the Lambda backend.
+The browser needs a secure HTTP endpoint to invoke backend functionality.
 
 ### Advantages
 
-- Managed API service
+- Fully managed API service
 - HTTPS endpoints
-- Integrates with Lambda
+- Lambda integration
 - CORS support
-- Scalable
-- Authentication options
+- Automatic scaling
 
 ### Disadvantages
 
 - Additional configuration
 - CORS must be configured correctly
-- Adds another component to the architecture
+- Adds another distributed component to debug
 
 ---
 
 # AWS Lambda
 
-Lambda will contain the contact form business logic.
-
-Planned Lambda responsibilities:
+Lambda function:
 
 ```text
-Receive Request
+CloudNovaContactHandler
+```
+
+Responsibilities:
+
+```text
+Receive request
       |
-Validate Input
+Validate fields
       |
 Generate UUID
       |
-Save Lead
+Add timestamp
       |
-Send Emails
+Store enquiry
       |
-Return Response
+Send notification
+      |
+Return response
 ```
 
-### Why Lambda?
+## Why Lambda Instead of EC2?
 
-The backend only needs to execute when a customer submits the contact form.
+The function executes only when the form is submitted.
+
+This makes Lambda suitable for:
+
+- Event-driven workloads
+- Intermittent traffic
+- Short backend operations
+- Automatic scaling
 
 ### Advantages
 
 - No server management
 - Automatic scaling
-- Event-driven
-- Pay based on usage
-- Integrates with other AWS services
+- Event-driven execution
+- Usage-based pricing
+- Native AWS integrations
 
 ### Disadvantages
 
@@ -564,12 +415,9 @@ The backend only needs to execute when a customer submits the contact form.
 
 # Amazon DynamoDB
 
-DynamoDB will store submitted contact enquiries.
-
-Planned table:
+Table:
 
 ```text
-Table Name:
 ContactMessages
 ```
 
@@ -579,330 +427,359 @@ Partition key:
 id
 ```
 
-Example record:
+Example item:
 
 ```json
 {
   "id": "generated-uuid",
-  "name": "Shiva",
-  "email": "shiva@example.com",
+  "name": "Example User",
+  "email": "user@example.com",
   "phone": "9876543210",
-  "message": "I need help deploying my application.",
-  "createdAt": "2026-11-05T10:30:00Z"
+  "message": "I need help with AWS deployment.",
+  "createdAt": "2026-11-05T10:30:00.000Z"
 }
 ```
 
-### Why DynamoDB?
+## Why DynamoDB Instead of RDS?
 
-The contact form has a simple data structure.
+Each enquiry is an independent record.
 
-We do not require:
+The application does not currently require:
 
 - SQL joins
 - Foreign keys
 - Complex relational queries
-- Large relational schemas
+- Multi-table transactions
+
+DynamoDB therefore provides a simple serverless persistence layer.
 
 ### Advantages
 
 - Fully managed
 - Serverless
 - Automatically scalable
-- Fast key-based access
-- Good Lambda integration
+- Fast key-based operations
+- Integrates naturally with Lambda
 
 ### Disadvantages
 
 - No relational joins
-- Requires different data modelling from SQL databases
-- Complex queries can be harder than relational databases
-
----
-
-# Why DynamoDB Instead of RDS?
-
-RDS is better suited to relational systems containing relationships such as:
-
-```text
-Customers
-   |
-Orders
-   |
-Order Items
-   |
-Products
-   |
-Payments
-```
-
-CloudNova only needs to store independent contact messages.
-
-Therefore DynamoDB provides a simpler solution for this use case.
+- Different data modelling approach from SQL
+- Complex querying can require additional design
 
 ---
 
 # Amazon SES
 
-**Amazon Simple Email Service (SES)** will handle application-generated emails.
+Amazon Simple Email Service sends an owner notification whenever someone submits the contact form.
 
-When someone submits the Contact Us form:
+Current workflow:
 
 ```text
-               Lambda
-               /    \
-              /      \
-             v        v
-      Customer Email  Admin Email
+Lambda
+  |
+  v
+Amazon SES
+  |
+  v
+CloudNova Owner
 ```
 
-The customer receives an acknowledgement.
+The email contains:
 
-Example:
+- Visitor name
+- Visitor email
+- Phone number
+- Message
+- Enquiry ID
+- Submission timestamp
+
+The visitor's email is configured as the Reply-To address, allowing the owner to reply directly to the enquiry.
+
+## Customer Confirmation Emails
+
+Customer confirmation emails are planned after SES production access is enabled.
+
+Current SES sandbox restrictions prevent arbitrary unverified recipient addresses from receiving messages.
+
+---
+
+# AWS IAM
+
+Lambda uses:
 
 ```text
-Hi Shiva,
-
-Thank you for contacting CloudNova.
-
-We have received your enquiry and will get back to you soon.
-
-Reference ID: CN-12345
+CloudNovaContactLambdaRole
 ```
 
-The administrator receives the lead information.
-
-Example:
+Policies:
 
 ```text
-New CloudNova Enquiry
+AWSLambdaBasicExecutionRole
+CloudNovaContactLambdaPolicy
+```
 
-Name: Shiva
-Email: shiva@example.com
-Phone: 9876543210
+The custom policy grants only the permissions required by the function:
 
-Message:
-I need help deploying my application.
+```text
+dynamodb:PutItem
+ses:SendEmail
+```
+
+This follows the principle of least privilege.
+
+Lambda does not receive unnecessary permissions such as:
+
+```text
+s3:DeleteBucket
+ec2:RunInstances
+dynamodb:DeleteTable
 ```
 
 ---
 
 # Amazon CloudWatch
 
-CloudWatch will provide monitoring and logging.
+CloudWatch provides observability for the backend.
 
-It will help inspect:
+Lambda logs are written to:
 
-- Lambda executions
+```text
+/aws/lambda/CloudNovaContactHandler
+```
+
+CloudWatch helps monitor:
+
+- Function invocations
 - Errors
-- Request processing
 - Execution duration
+- Request processing
 - Application logs
 
-Example:
+This allows backend failures to be diagnosed without accessing a server directly.
+
+---
+
+# Security Design
+
+The project applies several basic cloud security practices:
+
+- S3 Block Public Access enabled
+- S3 accessible through CloudFront OAC
+- HTTPS frontend delivery
+- HTTPS API endpoint
+- Least-privilege Lambda IAM role
+- No AWS credentials stored in frontend JavaScript
+- SES sender identity verified
+- DynamoDB not exposed directly to the browser
+- Backend resources accessed through Lambda
+
+---
+
+# Static vs Dynamic Content
+
+## Static
+
+Delivered from S3 through CloudFront:
+
+- Home
+- Services
+- Projects
+- About
+- Contact form interface
+
+## Dynamic
+
+Processed through the serverless backend:
+
+- Contact form submission
+- Input validation
+- UUID generation
+- Timestamp generation
+- DynamoDB persistence
+- SES email notification
+- API response
+- Reference ID displayed to the user
+
+---
+
+# Deployment Process
 
 ```text
-API Gateway
-     |
-Lambda
-     |
-ERROR
-     |
-CloudWatch Logs
+Develop frontend locally
+        |
+        v
+Create deployment bundle
+        |
+        v
+Upload to S3
+        |
+        v
+CloudFront distribution
+        |
+        v
+Create DynamoDB table
+        |
+        v
+Verify SES identity
+        |
+        v
+Create IAM role
+        |
+        v
+Create Lambda
+        |
+        v
+Test Lambda
+        |
+        v
+Create API Gateway HTTP API
+        |
+        v
+Configure POST /contact
+        |
+        v
+Configure CORS
+        |
+        v
+Update contact.js
+        |
+        v
+Upload updated JavaScript
+        |
+        v
+Invalidate CloudFront cache
+        |
+        v
+End-to-end testing
 ```
 
 ---
 
-# IAM
+# Screenshots
 
-AWS Identity and Access Management will control permissions between services.
-
-The Lambda function should only receive the permissions that it actually needs.
-
-Example:
-
-```text
-Lambda
- |
- +-- dynamodb:PutItem
- |
- +-- ses:SendEmail
- |
- +-- CloudWatch logging
-```
-
-It should not automatically receive unrelated permissions such as:
-
-```text
-Delete S3 buckets
-Create EC2 instances
-Modify VPC resources
-```
-
-This follows the **Principle of Least Privilege**.
-
----
-
-# Current Project Status
-
-## Phase 1 - Frontend and Static Hosting
-
-- [x] Build CloudNova HTML frontend
-- [x] Create CSS styling
-- [x] Create JavaScript contact form handling
-- [x] Test CloudNova locally
-- [x] Create deployment bundle
-- [x] Create Amazon S3 bucket
-- [x] Keep S3 bucket private
-- [x] Upload frontend files to S3
-- [x] Create CloudFront distribution
-- [x] Configure Origin Access Control
-- [x] Configure `index.html` as default root object
-- [x] Deploy CloudNova over HTTPS
-
-## Phase 2 - Serverless Backend
-
-- [ ] Create DynamoDB `ContactMessages` table
-- [ ] Configure Amazon SES
-- [ ] Verify email identities
-- [ ] Create Lambda IAM role
-- [ ] Create Lambda contact handler
-- [ ] Store contact enquiries in DynamoDB
-- [ ] Send customer confirmation email
-- [ ] Send administrator notification email
-- [ ] Configure CloudWatch logging
-
-## Phase 3 - API Integration
-
-- [ ] Create API Gateway
-- [ ] Create `POST /contact`
-- [ ] Integrate API Gateway with Lambda
-- [ ] Configure CORS
-- [ ] Test API independently
-- [ ] Update `contact.js`
-- [ ] Connect frontend using Fetch API
-- [ ] Deploy updated JavaScript to S3
-- [ ] Invalidate CloudFront cache
-- [ ] Perform end-to-end testing
-
----
-
-# Deployment Structure
-
-```text
-cloudnova-deploy/
-|
-├── index.html
-├── css/
-│   └── style.css
-└── js/
-    └── contact.js
-```
+| Screenshot | Description |
+|---|---|
+| `01-cloudfront-live-site.png` | CloudNova running through CloudFront |
+| `02-s3-private-bucket.png` | Static files stored in private S3 |
+| `03-cloudfront-distribution.png` | CloudFront distribution configuration |
+| `04-dynamodb-table.png` | ContactMessages table and stored enquiry |
+| `05-ses-verified-identity.png` | Verified SES identity |
+| `06-lambda-function.png` | CloudNovaContactHandler |
+| `07-api-gateway-route.png` | POST /contact route |
+| `08-cloudwatch-logs.png` | Lambda CloudWatch log stream |
+| `09-live-form-success.png` | Successful live enquiry with reference ID |
 
 ---
 
 # Repository Structure
 
 ```text
-AWS-Cloud-Projects/
-|
-└── 01-Serverless-Lead-Capture/
-    |
-    ├── README.md
-    |
-    ├── architecture/
-    |
-    ├── deployment/
-    |
-    └── screenshots/
+01-Serverless-Lead-Capture/
+├── README.md
+│
+├── architecture/
+│   └── architecture.md
+│
+├── deployment/
+│   └── deployment-notes.md
+│
+└── screenshots/
+    ├── 01-cloudfront-live-site.png
+    ├── 02-s3-private-bucket.png
+    ├── 03-cloudfront-distribution.png
+    ├── 04-dynamodb-table.png
+    ├── 05-ses-verified-identity.png
+    ├── 06-lambda-function.png
+    ├── 07-api-gateway-route.png
+    ├── 08-cloudwatch-logs.png
+    └── 09-live-form-success.png
 ```
+
+---
+
+# Completed Features
+
+- [x] Build CloudNova frontend
+- [x] Test website locally
+- [x] Create deployment bundle
+- [x] Create private S3 bucket
+- [x] Upload frontend to S3
+- [x] Configure CloudFront
+- [x] Configure Origin Access Control
+- [x] Serve website over HTTPS
+- [x] Create DynamoDB ContactMessages table
+- [x] Verify SES owner identity
+- [x] Create Lambda IAM role
+- [x] Apply least-privilege permissions
+- [x] Create Lambda contact handler
+- [x] Store enquiries in DynamoDB
+- [x] Send owner notification using SES
+- [x] Verify CloudWatch logging
+- [x] Create API Gateway HTTP API
+- [x] Create POST /contact
+- [x] Configure CORS
+- [x] Integrate API Gateway with Lambda
+- [x] Test API independently
+- [x] Connect frontend using Fetch API
+- [x] Deploy updated JavaScript
+- [x] Invalidate CloudFront cache
+- [x] Perform end-to-end testing
+
+---
+
+# Planned Improvements
+
+- [ ] Request SES production access
+- [ ] Send acknowledgement emails to customers
+- [ ] Restrict CORS further if deployment URL changes
+- [ ] Add CloudWatch alarm for Lambda errors
+- [ ] Improve email authentication using a custom domain if one is added later
+- [ ] Add infrastructure as code using Terraform or AWS CloudFormation
 
 ---
 
 # Key Learning Outcomes
 
-This project provides practical experience with:
+This project demonstrates practical understanding of:
 
 - AWS serverless architecture
-- Event-driven architecture
-- Amazon S3
-- Amazon CloudFront
+- Event-driven systems
+- S3 object storage
+- CloudFront CDN
 - Origin Access Control
-- AWS Lambda
 - API Gateway
+- Lambda
 - DynamoDB
-- Amazon SES
+- SES
 - IAM roles and policies
 - CloudWatch
+- CORS
+- HTTPS
 - Static vs dynamic applications
 - Server vs serverless architecture
-- HTTPS delivery
-- API integration
-- Cloud security principles
+- Least-privilege security
+- End-to-end cloud deployment
 
 ---
 
-# Architecture Decision Summary
-
-| Requirement | AWS Service | Reason |
-|---|---|---|
-| Static frontend storage | Amazon S3 | No application server required |
-| HTTPS and global delivery | CloudFront | CDN, caching and secure S3 access |
-| Backend API | API Gateway | Managed HTTP endpoint |
-| Business logic | Lambda | Event-driven serverless compute |
-| Lead storage | DynamoDB | Simple serverless NoSQL storage |
-| Email notifications | SES | Managed application email delivery |
-| Permissions | IAM | Least-privilege access control |
-| Monitoring | CloudWatch | Logs and metrics |
-
----
-
-# Future Request Flow
+## Final Architecture Summary
 
 ```text
-Visitor
-  |
-  v
 CloudFront
-  |
-  v
-S3
-  |
-  v
-CloudNova Contact Form
-  |
-  | POST /contact
-  v
+    |
+Private S3
+    |
+CloudNova Frontend
+    |
 API Gateway
-  |
-  v
+    |
 Lambda
-  |
-  +--------------------------+
-  |                          |
-  v                          v
-DynamoDB                    SES
-Store enquiry       Customer + Admin Email
-  |
-  v
+   / \
+  /   \
+DDB   SES
+ |
 CloudWatch
 ```
 
----
-
-## Status
-
-**Phase 1: Completed**
-
-CloudNova is successfully deployed using:
-
-```text
-Amazon S3
-+
-Amazon CloudFront
-+
-Origin Access Control
-+
-HTTPS
-```
-
-The next phase is implementing the dynamic serverless backend using **DynamoDB, SES, IAM and AWS Lambda**.
+CloudNova demonstrates how a simple static application can be extended into a scalable, event-driven serverless application using managed AWS services.
