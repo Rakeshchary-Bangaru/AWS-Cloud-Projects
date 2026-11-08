@@ -6,8 +6,8 @@ Hands-on AWS projects covering cloud architecture, serverless applications, IoT,
 
 1. Serverless Lead Capture on AWS
 2. Real-Time IoT Printer Monitoring on AWS
-3. Highly Available Two-Tier WordPress Application
-4. Cloud Transformation of The EpicBook
+3. Two-Tier-TaskFlow
+4. TaskFlow-Cloud_Transformation
 5. Real-World Three-Tier Web Application Deployment on AWS
 
 ## AWS Topics
