@@ -1,0 +1,8 @@
+{
+  "printerId": "printer-001",
+  "timestamp": "2026-11-15T12:31:27.687179+00:00",
+  "data": {
+    "type": "temperature",
+    "value": 85.82
+  }
+}

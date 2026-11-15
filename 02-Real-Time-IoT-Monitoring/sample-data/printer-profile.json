@@ -1,0 +1,9 @@
+{
+  "PrinterId": "printer-001",
+  "LowerThreshold": 20,
+  "UpperThreshold": 80,
+  "Window": 10,
+  "OutOfBoundsCount": 0,
+  "EventCount": 5,
+  "LastSeen": "2026-11-15T12:31:27.687179+00:00"
+}

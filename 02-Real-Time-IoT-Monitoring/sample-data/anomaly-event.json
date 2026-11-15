@@ -1,0 +1,10 @@
+{
+  "PrinterId": "printer-001",
+  "Timestamp": "2026-11-15T09:47:34.543570+00:00",
+  "SensorType": "temperature",
+  "Value": 93.92,
+  "LowerThreshold": 20,
+  "UpperThreshold": 80,
+  "Severity": "HIGH",
+  "EventNumber": 5
+}
